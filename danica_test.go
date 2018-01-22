@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/robertkrimen/otto/parser"
 )
 
 func TestHelloWorld(t *testing.T) {
@@ -27,16 +29,30 @@ func TestHelloWorld(t *testing.T) {
 
 func TestFromContent(t *testing.T) {
 	content := `
-    const hello = require("./src/hello");
-    const world = require("./src/world");
+    var hello = require("./src/hello");
+    var world = require("./src/world");
     console.log(hello() + " + " + world());
   `
 
 	os.Mkdir("src", os.ModePerm)
-	ioutil.WriteFile("src/hello", []byte(`module.exports = () => "hello";`), os.ModePerm)
-	ioutil.WriteFile("src/world", []byte(`module.exports = () => "world";`), os.ModePerm)
+	hello := `module.exports = () => "hello";`
+	ioutil.WriteFile("src/hello", []byte(hello), os.ModePerm)
+	world := `module.exports = () => "world";`
+	ioutil.WriteFile("src/world", []byte(world), os.ModePerm)
 
 	err := BundleContent(content, "dist/out.js")
+	if err != nil {
+		el, ok := err.(parser.ErrorList)
+		if ok {
+			for i := range el {
+				t.Logf("%s", el[i])
+			}
+		}
+	}
 	assert.Nil(t, err)
-	//TODO: this next
+	r, err := ioutil.ReadFile("dist/out.js")
+	assert.Nil(t, err)
+	assert.Equal(t, string(r), crazy_miguel_stuff+"\n"+content+"\n"+
+		hello+"\n"+
+		world)
 }

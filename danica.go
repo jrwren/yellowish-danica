@@ -5,6 +5,10 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
+
+	"github.com/robertkrimen/otto/ast"
+	"github.com/robertkrimen/otto/parser"
 )
 
 const (
@@ -18,24 +22,82 @@ func BundleFile(src, dest string) error {
 		return err
 	}
 	defer f.Close()
-	basename := path.Dir(dest)
-	log.Println("creating directory " + basename)
-	err = os.MkdirAll(basename, os.ModePerm)
-	if err != nil {
-		return err
-	}
-	d, err := os.Create(dest)
+	d, err := openDest(dest)
 	if err != nil {
 		return err
 	}
 	defer d.Close()
-	io.WriteString(d, crazy_miguel_stuff)
-	io.WriteString(d, "\n")
 	c, err := io.Copy(d, f)
 	log.Printf("%d bytes written\n", c)
 	return err
 }
 
 func BundleContent(content, dest string) error {
-	return nil
+	program, err := parser.ParseFile(nil, "", content, 0)
+	if err != nil {
+		return err
+	}
+	fnames := findRequires(program)
+	d, err := openDest(dest)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	for i := range fnames {
+		f, err := os.Open(fnames[i])
+		if err != nil {
+			return err
+		}
+		io.Copy(d, f)
+		f.Close()
+		io.WriteString(d, "\n")
+	}
+	return err
+}
+
+func findRequires(p *ast.Program) (filenames []string) {
+	ast.Walk(&enterOnly{func(n ast.Node) {
+		ce, ok := n.(*ast.CallExpression)
+		if !ok {
+			return
+		}
+		id, ok := ce.Callee.(*ast.Identifier)
+		if !ok {
+			return
+		}
+		if id.Name != "require" {
+			return
+		}
+		fname := ce.ArgumentList[0].(*ast.StringLiteral).Literal
+		fname = strings.Trim(fname, `"`)
+		filenames = append(filenames, fname)
+		return
+	}}, p)
+	return
+}
+
+type enterOnly struct {
+	f func(n ast.Node)
+}
+
+func (e *enterOnly) Enter(n ast.Node) (v ast.Visitor) {
+	e.f(n)
+	return e
+}
+
+func (e *enterOnly) Exit(n ast.Node) {}
+
+func openDest(dest string) (*os.File, error) {
+	basename := path.Dir(dest)
+	err := os.MkdirAll(basename, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	d, err := os.Create(dest)
+	if err != nil {
+		return nil, err
+	}
+	io.WriteString(d, crazy_miguel_stuff)
+	io.WriteString(d, "\n")
+	return d, nil
 }
