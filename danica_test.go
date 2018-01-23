@@ -32,7 +32,7 @@ func TestFromContent(t *testing.T) {
     var hello = require("./src/hello");
     var world = require("./src/world");
     console.log(hello() + " + " + world());
-  `
+`
 
 	os.Mkdir("src", os.ModePerm)
 	hello := `module.exports = () => "hello";`
@@ -52,7 +52,13 @@ func TestFromContent(t *testing.T) {
 	assert.Nil(t, err)
 	r, err := ioutil.ReadFile("dist/out.js")
 	assert.Nil(t, err)
-	assert.Equal(t, string(r), crazy_miguel_stuff+"\n"+content+"\n"+
-		hello+"\n"+
-		world)
+
+	assert.Equal(t, crazy_miguel_stuff+"\n"+content+"\n"+
+		`},{"./src/hello":2,"./src/world":3}],2:[function(require,module,exports){`+
+			"\n"+
+		hello+"\n\n"+
+		`},{}],3:[function(require,module,exports){`+ "\n"+
+		world+"\n\n"+
+		`},{}]},{},[1])`,
+		string(r))
 }

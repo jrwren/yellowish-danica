@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/robertkrimen/otto/ast"
@@ -43,7 +44,24 @@ func BundleContent(content, dest string) error {
 		return err
 	}
 	defer d.Close()
+	io.WriteString(d, content)
+	io.WriteString(d, "\n")
+	// },{"./src/hello":2,"./src/world":3}],2:[function(require,module,exports){
+	io.WriteString(d, `},{`)
 	for i := range fnames {
+		io.WriteString(d, `"`)
+		io.WriteString(d, fnames[i])
+		io.WriteString(d, `":`)
+		io.WriteString(d, strconv.Itoa(i+2))
+		if i < len(fnames)-1 {
+			io.WriteString(d, `,`)
+		}
+	}
+	io.WriteString(d, `}],`)
+	for i := range fnames {
+		io.WriteString(d, strconv.Itoa(i+2))
+		io.WriteString(d, `:[function(require,module,exports){`)
+		io.WriteString(d, "\n")
 		f, err := os.Open(fnames[i])
 		if err != nil {
 			return err
@@ -51,7 +69,13 @@ func BundleContent(content, dest string) error {
 		io.Copy(d, f)
 		f.Close()
 		io.WriteString(d, "\n")
+		io.WriteString(d, "\n")
+		io.WriteString(d, `},{}]`)
+		if i < len(fnames)-1 {
+			io.WriteString(d, `,`)
+		}
 	}
+	io.WriteString(d, `},{},[1])`)
 	return err
 }
 
